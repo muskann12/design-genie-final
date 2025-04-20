@@ -1,4 +1,4 @@
-'use client';
+'use client'
 import { OrderDataType } from '@/helper/componentTypes';
 import React, { useEffect, useState } from 'react';
 import { PaymentOptions } from './handlePayment';
