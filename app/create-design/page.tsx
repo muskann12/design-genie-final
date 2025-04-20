@@ -1,11 +1,12 @@
 'use client';
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import Card from "@/app/components/ui/card";
 import { CardContent } from "../components/ui/cardconten";
 import { motion, AnimatePresence } from "framer-motion";
-import { UploadCloud, X, Sparkles, ShoppingCart, Check } from "lucide-react";
+import { UploadCloud, X, Sparkles, ShoppingCart, Check, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import axios from "axios";
+import { useRouter } from "next/navigation";
 
 interface CartItem {
   name: string;
@@ -18,6 +19,7 @@ interface CartItem {
 }
 
 const CreatorDesignPage = () => {
+  const router = useRouter();
   const [selectedItem, setSelectedItem] = useState("Shirt");
   const [quantity, setQuantity] = useState(1);
   const [color, setColor] = useState("Black");
@@ -28,6 +30,7 @@ const CreatorDesignPage = () => {
   const [customPrompt, setCustomPrompt] = useState("");
   const [loading, setLoading] = useState(false);
   const [isAddedToCart, setIsAddedToCart] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const items = [
     { 
@@ -36,13 +39,6 @@ const CreatorDesignPage = () => {
       sizes: ["S", "M", "L", "XL"], 
       colors: ["Black", "White", "Red", "Blue"], 
       price: 25 
-    },
-    { 
-      name: "Mug", 
-      image: "/images/mug1.png", 
-      sizes: [], 
-      colors: ["Black", "White"], 
-      price: 10 
     },
     { 
       name: "Cap", 
@@ -55,11 +51,25 @@ const CreatorDesignPage = () => {
 
   const designAreas = ["Front", "Back", "Logo", "Sleeves"];
   const suggestedPrompts = [
-    "Futuristic city skyline",
-    "Enchanted forest with glowing plants",
-    "Cyberpunk-style character",
-    "Space station orbiting a planet"
+    "Minimalist geometric pattern",
+    "Vintage retro typography design",
+    "Abstract watercolor splash",
+    "Neon cyberpunk illustration",
+    "Nature-inspired botanical drawing",
+    "Gradient mesh futuristic artwork",
+    "Hand-drawn sketch style",
+    "3D rendered metallic effect"
   ];
+
+  const prefix = "Create a design for printing ";
+  
+  useEffect(() => {
+    // Set cursor position to end of prefix when component mounts
+    if (inputRef.current) {
+      inputRef.current.selectionStart = prefix.length;
+      inputRef.current.selectionEnd = prefix.length;
+    }
+  }, []);
 
   const selectedProduct = items.find((item) => item.name === selectedItem) ?? {
     name: "",
@@ -87,18 +97,19 @@ const CreatorDesignPage = () => {
 
   const handlePromptSelect = (prompt: string) => {
     setSelectedPrompt(prompt);
+    setCustomPrompt(prompt);
     toast.success(`Selected prompt: ${prompt}`);
   };
 
   const generateImage = async () => {
-    const prompt = selectedPrompt || `Create a design for printing ${customPrompt}`;
-    if (!prompt || prompt === "Create a design for printing ") {
+    const prompt = prefix + (selectedPrompt || customPrompt);
+    if (!prompt || prompt.trim() === prefix.trim()) {
       toast.error("Please enter your custom design description!");
       return;
     }
 
     setLoading(true);
-    toast.info("Generating image, please wait...");
+    toast.info("Generating your unique design...");
 
     try {
       const response = await axios.post(
@@ -109,13 +120,13 @@ const CreatorDesignPage = () => {
 
       if (response.data.imageUrl) {
         setUploadedImage(response.data.imageUrl);
-        toast.success("Image generated successfully!");
+        toast.success("Design created successfully!");
       } else {
-        toast.error("Failed to generate image.");
+        toast.error("Failed to generate design.");
       }
     } catch (error) {
       console.error("Error generating image:", error);
-      toast.error("Something went wrong while generating the image.");
+      toast.error("Something went wrong while generating the design.");
     } finally {
       setLoading(false);
     }
@@ -123,7 +134,7 @@ const CreatorDesignPage = () => {
 
   const addToCart = () => {
     if (!uploadedImage) {
-      toast.error("Please upload or generate an image first");
+      toast.error("Please upload or generate a design first");
       return;
     }
 
@@ -140,17 +151,11 @@ const CreatorDesignPage = () => {
       cartItem.designArea = shirtDesignArea;
     }
 
-    // Get existing cart items
     const existingCart = localStorage.getItem("cart");
     const cartItems = existingCart ? JSON.parse(existingCart) : [];
-    
-    // Add new item
     cartItems.push(cartItem);
-    
-    // Save to localStorage
     localStorage.setItem("cart", JSON.stringify(cartItems));
     
-    // Show success feedback
     setIsAddedToCart(true);
     toast.success(`${selectedProduct.name} added to cart!`, {
       action: {
@@ -160,27 +165,65 @@ const CreatorDesignPage = () => {
       duration: 3000
     });
     
-    // Reset after 3 seconds
     setTimeout(() => setIsAddedToCart(false), 3000);
   };
 
   const handlePromptChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const prefix = "Create a design for printing ";
     const value = e.target.value;
     
-    // Ensure the prefix remains and can't be deleted
+    // Prevent deletion of prefix
     if (!value.startsWith(prefix)) {
-      setCustomPrompt("");
-    } else {
-      setCustomPrompt(value.slice(prefix.length));
+      // If user tries to delete prefix, reset to prefix + customPrompt
+      e.target.value = prefix + customPrompt;
+      // Set cursor position to end
+      if (inputRef.current) {
+        inputRef.current.selectionStart = prefix.length + customPrompt.length;
+        inputRef.current.selectionEnd = prefix.length + customPrompt.length;
+      }
+      return;
     }
+    
+    // Update customPrompt with the new text after prefix
+    setCustomPrompt(value.slice(prefix.length));
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const input = e.target as HTMLInputElement;
+    const cursorPos = input.selectionStart;
+    
+    // Prevent backspace/delete within the prefix
+    if (cursorPos !== null && cursorPos <= prefix.length) {
+      if (e.key === 'Backspace' || e.key === 'Delete') {
+        e.preventDefault();
+      }
+    }
+    
+    // Prevent left arrow from going into prefix
+    if (e.key === 'ArrowLeft' && cursorPos !== null && cursorPos <= prefix.length) {
+      e.preventDefault();
+      input.setSelectionRange(prefix.length, prefix.length);
+    }
+  };
+
+  const handleClick = (e: React.MouseEvent<HTMLInputElement>) => {
+    const input = e.target as HTMLInputElement;
+    const cursorPos = input.selectionStart;
+    
+    // Prevent cursor placement within prefix
+    if (cursorPos !== null && cursorPos < prefix.length) {
+      input.setSelectionRange(prefix.length, prefix.length);
+    }
+  };
+
+  const navigateToPrompts = () => {
+    router.push("/prompt");
   };
 
   return (
     <div className="p-4 md:p-8 bg-gray-200 min-h-screen">
       <div className="text-center mb-6 md:mb-8">
-        <h1 className="text-3xl md:text-5xl font-extrabold text-black">Customization Studio</h1>
-        <h2 className="text-lg md:text-xl font-semibold">Design Your Perfect Item</h2>
+        <h1 className="text-3xl md:text-5xl font-extrabold text-black">Design Studio</h1>
+        <h2 className="text-lg md:text-xl font-semibold">Create Your Custom {selectedItem}</h2>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
@@ -296,7 +339,7 @@ const CreatorDesignPage = () => {
               <div className="border-2 border-dashed border-gray-300 p-6 text-center rounded-lg cursor-pointer h-full flex flex-col items-center justify-center">
                 <label className="flex flex-col items-center cursor-pointer">
                   <UploadCloud size={24} className="text-blue-500 mb-2 sm:size-32" />
-                  <span className="text-gray-700 text-xs sm:text-sm font-medium">Click to Upload or Create Design</span>
+                  <span className="text-gray-700 text-xs sm:text-sm font-medium">Upload your design or generate one</span>
                   <input 
                     type="file" 
                     accept="image/*" 
@@ -327,7 +370,7 @@ const CreatorDesignPage = () => {
 
           <div className="space-y-4">
             <h3 className="text-xs sm:text-sm font-medium text-gray-700 flex items-center gap-2">
-              <Sparkles size={14} className="text-amber-500" /> Creative Prompts:
+              <Sparkles size={14} className="text-amber-500" /> Design Inspiration:
             </h3>
             <div className="flex flex-wrap gap-2">
               {suggestedPrompts.map((prompt, index) => (
@@ -348,25 +391,50 @@ const CreatorDesignPage = () => {
             <div className="relative">
               <input
                 type="text"
-                value={`Create a design for printing ${customPrompt}`}
+                ref={inputRef}
+                value={prefix + customPrompt}
                 onChange={handlePromptChange}
+                onKeyDown={handleKeyDown}
+                onClick={handleClick}
                 className="w-full px-4 py-2 border rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-800 text-black"
               />
-              <div 
-                className="absolute left-4 top-2 pointer-events-none text-gray-500 text-xs sm:text-sm"
-                style={{ display: customPrompt.length === 0 ? 'block' : 'none' }}
-              >
-                Create a design for printing
-              </div>
+              {/* Placeholder that shows when customPrompt is empty */}
+              {!customPrompt && (
+                <div className="absolute left-4 top-2 pointer-events-none text-gray-500 text-xs sm:text-sm">
+                  {prefix}Describe your design...
+                </div>
+              )}
             </div>
+            
+            <div 
+              className="flex items-center justify-end gap-1 text-blue-600 hover:text-blue-800 cursor-pointer text-xs sm:text-sm"
+              onClick={navigateToPrompts}
+            >
+              <span>Browse more design ideas</span>
+              <ChevronRight size={14} />
+            </div>
+
             <button 
               onClick={generateImage} 
               disabled={loading} 
               className={`w-full py-2 rounded-lg text-xs sm:text-sm ${
                 loading ? "bg-gray-400 cursor-not-allowed" : "bg-blue-950 hover:bg-blue-900"
-              } text-white`}
+              } text-white flex items-center justify-center gap-2`}
             >
-              {loading ? "Generating..." : "GENERATE DESIGN"}
+              {loading ? (
+                <>
+                  <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <Sparkles size={14} />
+                  GENERATE DESIGN
+                </>
+              )}
             </button>
           </div>
 
@@ -390,7 +458,7 @@ const CreatorDesignPage = () => {
               ) : (
                 <>
                   <ShoppingCart size={18} />
-                  <span>Add to Cart</span>
+                  <span>Add to Cart - PKR {(selectedProduct.price * quantity).toFixed(2)}</span>
                 </>
               )}
             </button>
