@@ -1,4 +1,4 @@
-'use client';
+'use client'
 import { useState, useRef, useEffect } from "react";
 import Card from "@/app/components/ui/card";
 import { CardContent } from "../components/ui/cardconten";
@@ -103,30 +103,38 @@ const CreatorDesignPage = () => {
 
   const generateImage = async () => {
     const prompt = prefix + (selectedPrompt || customPrompt);
-    if (!prompt || prompt.trim() === prefix.trim()) {
+    if (!prompt.trim() || prompt === prefix) {
       toast.error("Please enter your custom design description!");
       return;
     }
-
+  
     setLoading(true);
     toast.info("Generating your unique design...");
-
+  
     try {
-      const response = await axios.post(
-        "/api/generate",
-        { prompt },
-        { headers: { "Content-Type": "application/json" } }
-      );
-
-      if (response.data.imageUrl) {
-        setUploadedImage(response.data.imageUrl);
+      const response = await fetch('/api/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ prompt: prompt.trim() })
+      });
+  
+      const data = await response.json();
+  
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to generate image');
+      }
+  
+      if (data.imageUrl) {
+        setUploadedImage(data.imageUrl);
         toast.success("Design created successfully!");
       } else {
-        toast.error("Failed to generate design.");
+        throw new Error("Invalid response format");
       }
-    } catch (error) {
-      console.error("Error generating image:", error);
-      toast.error("Something went wrong while generating the design.");
+    } catch (error: any) {
+      console.error("Generation Error:", error);
+      toast.error(error.message || "Failed to generate design");
     } finally {
       setLoading(false);
     }
